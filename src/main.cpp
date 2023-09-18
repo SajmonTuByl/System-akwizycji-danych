@@ -3,6 +3,10 @@
 // Load Wi-Fi library
 #include <WiFi.h>
 
+static void WiFi_Connect();
+static void TCP_SendDataToServer();
+static void RunWebServer();
+
 // WiFi network credentials
 char* ssid     = "TP-LINK_C1C8";
 char* password = "44498245";
@@ -23,8 +27,24 @@ String output27State = "off";
 const int output25 = 25;
 const int output27 = 27;
 
-void setup() {
+void setup(){
   //Serial.begin(115200);
+
+  Serial.begin(115200);
+  Serial.print("Connecting to ");
+  Serial.println(ssid);
+  WiFi.begin(ssid, password);
+  while (WiFi.status() != WL_CONNECTED)
+  {
+    delay(500);
+    Serial.print(".");
+  }
+
+  // Print local IP address
+  Serial.println("");
+  Serial.println("WiFi connected.");
+  Serial.println("IP address: ");
+  Serial.println(WiFi.localIP());
 
   // Initialize the output variables as outputs
   pinMode(output25, OUTPUT);
@@ -48,6 +68,7 @@ void loop(){
   // Start a local web server on a given module
   RunWebServer();
 }
+
 void TCP_SendDataToServer() {
   uint32_t currentMillis = millis();
   static uint32_t lastMillis;
@@ -69,7 +90,8 @@ void TCP_SendDataToServer() {
         client_A.print("A");
     }
   }
-  }
+}
+
 
 void RunWebServer(){
   //--- Ta część dotyczy WebServera ---
@@ -166,23 +188,23 @@ void RunWebServer(){
     client.stop();
     Serial.println("Client disconnected.");
     Serial.println("------");
-
 }
 }
 
-  void WiFi_Connect(){
-    Serial.begin(115200);
-    Serial.print("Connecting to ");
-    Serial.println(ssid);
-    WiFi.begin(ssid, password);
-    while (WiFi.status() != WL_CONNECTED) {
-      delay(500);
-      Serial.print(".");
-    }
-
-    // Print local IP address
-    Serial.println("");
-    Serial.println("WiFi connected.");
-    Serial.println("IP address: ");
-    Serial.println(WiFi.localIP());
+void WiFi_Connect(){
+  Serial.begin(115200);
+  Serial.print("Connecting to ");
+  Serial.println(ssid);
+  WiFi.begin(ssid, password);
+  while (WiFi.status() != WL_CONNECTED)
+  {
+    delay(500);
+    Serial.print(".");
   }
+
+  // Print local IP address
+  Serial.println("");
+  Serial.println("WiFi connected.");
+  Serial.println("IP address: ");
+  Serial.println(WiFi.localIP());
+}

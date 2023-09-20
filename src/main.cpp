@@ -8,8 +8,10 @@ static void TCP_SendDataToServer();
 static void RunWebServer();
 
 // WiFi network credentials
-char* ssid     = "TP-LINK_C1C8";
-char* password = "44498245";
+//String ssid     = "TP-LINK_C1C8";
+//String password = "44498245";
+String ssid     = "Galaxy M21D80A";
+String password = "grai9133";
 
 // Server credentials
 IPAddress serverIP(192, 168, 0, 101);
@@ -28,23 +30,7 @@ const int output25 = 25;
 const int output27 = 27;
 
 void setup(){
-  //Serial.begin(115200);
-
   Serial.begin(115200);
-  Serial.print("Connecting to ");
-  Serial.println(ssid);
-  WiFi.begin(ssid, password);
-  while (WiFi.status() != WL_CONNECTED)
-  {
-    delay(500);
-    Serial.print(".");
-  }
-
-  // Print local IP address
-  Serial.println("");
-  Serial.println("WiFi connected.");
-  Serial.println("IP address: ");
-  Serial.println(WiFi.localIP());
 
   // Initialize the output variables as outputs
   pinMode(output25, OUTPUT);
@@ -74,22 +60,28 @@ void TCP_SendDataToServer() {
   static uint32_t lastMillis;
   const uint32_t interval = 5000;
   
+  // Connects to the server, where SQL server is installed
   if (!client_A.connected()) {
-    if (client_A.connect(serverIP, portNumber)) {                                         // Connects to the server
+    if (client_A.connect(serverIP, portNumber)) {                                         
       Serial.print("Connected to Gateway IP = "); Serial.println(serverIP);
     } else {
       Serial.print("Could NOT connect to Gateway IP = "); Serial.println(serverIP);
       delay(500);
     }
+
+    // If succesfully connected to the server, the following lines will be executed
   } else {
-    while (client_A.available()) Serial.write(client_A.read());                             // Receives data from the server and sends to the serial port
-    //while (client_A.available()) client_A.write(Serial.read());  to nie dziła w drugą stronę
+    // Receives data from the server and sends to the serial port
+    while (client_A.available()) Serial.write(client_A.read());
+    //while (client_A.available()) client_A.write(Serial.read());  to nie działa tak po prostu w drugą stronę
     
-    if (currentMillis - lastMillis >= interval) {                                       // Sends the letter A (could be anything) to the server once every 'interval'
+    // Sends the letter A (could be anything) to the server once every 'interval'
+    if (currentMillis - lastMillis >= interval) {
         lastMillis += interval;
         client_A.print("A");
     }
   }
+  
 }
 
 
@@ -192,7 +184,6 @@ void RunWebServer(){
 }
 
 void WiFi_Connect(){
-  Serial.begin(115200);
   Serial.print("Connecting to ");
   Serial.println(ssid);
   WiFi.begin(ssid, password);

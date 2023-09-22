@@ -1,3 +1,4 @@
+/*
 #include <Arduino.h>
 
 // Load Wi-Fi library
@@ -199,3 +200,4 @@ void WiFi_Connect(){
   Serial.println("IP address: ");
   Serial.println(WiFi.localIP());
 }
+*/

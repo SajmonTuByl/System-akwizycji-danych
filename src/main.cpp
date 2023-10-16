@@ -1,24 +1,23 @@
 #include <Arduino.h>
-
-// Load Wi-Fi library
-#include <WiFi.h>
+#include <WiFi.h>                         // ESP32 Wi-Fi library
 
 static void WiFi_Connect();
 static void TCP_SendDataToServer();
 static void RunWebServer();
 
 // WiFi network credentials
-//String ssid     = "TP-LINK_C1C8";
-//String password = "44498245";
-String ssid     = "Galaxy M21D80A";
-String password = "grai9133";
+String ssid     = "TP-LINK_C1C8";
+String password = "44498245";
+//String ssid     = "Galaxy M21D80A";
+//String password = "grai9133";
 
-// Server credentials
+// Data Acquisition Server credentials
 IPAddress serverIP(192, 168, 0, 101);
-#define portNumber 7005
+#define portNumber 11000
 WiFiClient client_A;
 
-// Set web server port number to 80
+//-----------------------------------------------------------
+// Set the Web Server port number to 80
 WiFiServer server(80);
 // Variable to store the HTTP request
 String header;
@@ -28,6 +27,7 @@ String output27State = "off";
 // Assign output variables to GPIO pins
 const int output25 = 25;
 const int output27 = 27;
+//-----------------------------------------------------------
 
 void setup(){
   Serial.begin(115200);
@@ -42,25 +42,25 @@ void setup(){
   // Connect to Wi-Fi network with SSID and password
   WiFi_Connect();
 
-  // and start web server
+  // and start the Web Server
   server.begin();
 }
 
 void loop(){
 
-  // Start function responsible for sending data from sensors to the server
-  TCP_SendDataToServer();
+  // Start function responsible for sending data from sensors to the Data Acquisition Server
+  TCP_SendDataToDas();
 
   // Start a local web server on a given module
   RunWebServer();
 }
 
-void TCP_SendDataToServer() {
+void TCP_SendDataToDas() {
   uint32_t currentMillis = millis();
   static uint32_t lastMillis;
-  const uint32_t interval = 5000;
+  const uint32_t interval = 500;
   
-  // Connects to the server, where SQL server is installed
+  // Connects to the computer, where the Data Acquisition Server (DAS) is installed
   if (!client_A.connected()) {
     if (client_A.connect(serverIP, portNumber)) {                                         
       Serial.print("Connected to Gateway IP = "); Serial.println(serverIP);
@@ -69,13 +69,13 @@ void TCP_SendDataToServer() {
       delay(500);
     }
 
-    // If succesfully connected to the server, the following lines will be executed
+    // If succesfully connected to the DAS, the following lines will be executed
   } else {
-    // Receives data from the server and sends to the serial port
+    // Receives data from the DAS and sends to the serial port
     while (client_A.available()) Serial.write(client_A.read());
     //while (client_A.available()) client_A.write(Serial.read());  to nie działa tak po prostu w drugą stronę
     
-    // Sends the letter A (could be anything) to the server once every 'interval'
+    // Sends the letter A (could be anything) to the DAS once every 'interval'
     if (currentMillis - lastMillis >= interval) {
         lastMillis += interval;
         client_A.print("A");

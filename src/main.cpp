@@ -1,10 +1,16 @@
-/*
 #include <Arduino.h>
 #include <WiFi.h>                         // ESP32 Wi-Fi library
 
 static void WiFi_Connect();
 static void TCP_SendDataToServer();
 static void RunWebServer();
+
+int deviceSerialNo = 1;
+String deviceName = "ArduinoModule_No1";
+String deviceIpAddress;
+String deviceStatus = "Ok";
+int deviceUpdateInterval = 500; //miliseconds
+int deviceBatteryLevel = 101;
 
 // WiFi network credentials
 String ssid     = "TP-LINK_C1C8";
@@ -32,26 +38,21 @@ const int output27 = 27;
 
 void setup(){
   Serial.begin(115200);
-
   // Initialize the output variables as outputs
   pinMode(output25, OUTPUT);
   pinMode(output27, OUTPUT);
   // Set outputs to LOW
   digitalWrite(output25, LOW);
   digitalWrite(output27, LOW);
-
   // Connect to Wi-Fi network with SSID and password
   WiFi_Connect();
-
   // and start the Web Server
   server.begin();
 }
 
 void loop(){
-
   // Start function responsible for sending data from sensors to the Data Acquisition Server
   TCP_SendDataToDas();
-
   // Start a local web server on a given module
   RunWebServer();
 }
@@ -59,14 +60,14 @@ void loop(){
 void TCP_SendDataToDas() {
   uint32_t currentMillis = millis();
   static uint32_t lastMillis;
-  const uint32_t interval = 500;
+  const uint32_t interval = deviceUpdateInterval;
   
   // Connects to the computer, where the Data Acquisition Server (DAS) is installed
   if (!client_A.connected()) {
     if (client_A.connect(serverIP, portNumber)) {                                         
-      Serial.print("Connected to Gateway IP = "); Serial.println(serverIP);
+      Serial.print("Connected to the Data Acquisition Server IP address = "); Serial.println(serverIP);
     } else {
-      Serial.print("Could NOT connect to Gateway IP = "); Serial.println(serverIP);
+      Serial.print("Could NOT connect to the Data Acquisition Server IP address = "); Serial.println(serverIP);
       delay(500);
     }
 
@@ -199,5 +200,31 @@ void WiFi_Connect(){
   Serial.println("WiFi connected.");
   Serial.println("IP address: ");
   Serial.println(WiFi.localIP());
+  deviceIpAddress = (WiFi.localIP()).toString();
 }
-*/
+
+class DeviceObj{
+  public:
+    int deviceSerialNo = 1;
+    String deviceName = "ArduinoModule_No1";
+    String deviceIpAddress;
+    String deviceStatus = "Ok";
+    int deviceUpdateInterval = 500; //miliseconds
+    int deviceBatteryLevel = 101;
+};
+
+class SensorObj{
+  public:
+    int parentSerialNo;
+    String parentName;
+    int sensorSerialNo;
+    String sensorName;
+    String sensorStatus;
+    String sensorType;
+    DateTime timeStamp;
+
+    float sensorValue_1;
+    float sensorValue_2;
+    String sensorUnit_1;
+    String sensorUnit_2;
+};

@@ -1,0 +1,5 @@
+Opis modułu pH metra
+https://www.electroniclinic.com/ph-meter-arduino-ph-meter-calibration-diymore-ph-sensor-arduino-code/
+
+ESP32 Basics: Analog-to-digital Converter
+https://lastminuteengineers.com/esp32-basics-adc/

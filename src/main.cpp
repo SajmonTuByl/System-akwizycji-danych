@@ -1,27 +1,52 @@
 #include <Arduino.h>
 #include <WiFi.h>                         // ESP32 Wi-Fi library
+#include <ArduinoJson.h>
 
 static void WiFi_Connect();
-static void TCP_SendDataToServer();
+static void SendDataToDas();
 static void RunWebServer();
 
+class SensorObj{
+  public:
+    int sensorSerialNo;
+    String sensorName;
+    String sensorStatus;
+    String sensorType;
+    //DateTime timeStamp;
+
+    float sensorValue;
+    String sensorUnit;
+};
+
+//-----------------------------------------------------------
+// WiFi network credentials
+String ssid     = "TestNetwork";
+String password = "TestNetwork";
+//String ssid     = "TP-LINK_C1C8";
+//String password = "44498245";
+//String ssid     = "Galaxy M21D80A";
+//String password = "grai9133";
+
+//-----------------------------------------------------------
+// Data Acquisition Server credentials
+//IPAddress serverIP(192, 168, 0, 102);
+IPAddress serverIP(192, 168, 1, 100);
+#define portNumber 11000
+WiFiClient client_WiFi;
+
+//-----------------------------------------------------------
+// Device parameters definition
 int deviceSerialNo = 1;
 String deviceName = "ArduinoModule_No1";
 String deviceIpAddress;
 String deviceStatus = "Ok";
-int deviceUpdateInterval = 500; //miliseconds
+int deviceUpdateInterval = 4000; //miliseconds
 int deviceBatteryLevel = 101;
+SensorObj sensor1;
 
-// WiFi network credentials
-String ssid     = "TP-LINK_C1C8";
-String password = "44498245";
-//String ssid     = "Galaxy M21D80A";
-//String password = "grai9133";
-
-// Data Acquisition Server credentials
-IPAddress serverIP(192, 168, 0, 101);
-#define portNumber 11000
-WiFiClient client_A;
+//-----------------------------------------------------------
+StaticJsonDocument<600> doc;
+//DynamicJsonDocument doc(600);
 
 //-----------------------------------------------------------
 // Set the Web Server port number to 80
@@ -37,13 +62,24 @@ const int output27 = 27;
 //-----------------------------------------------------------
 
 void setup(){
-  Serial.begin(115200);
+  Serial.begin(9600);
   // Initialize the output variables as outputs
   pinMode(output25, OUTPUT);
   pinMode(output27, OUTPUT);
   // Set outputs to LOW
   digitalWrite(output25, LOW);
   digitalWrite(output27, LOW);
+  
+  //-----------------------------------------------------------
+  // Sensor 1 definition
+  sensor1.sensorSerialNo = 1;
+  sensor1.sensorName = "Czujnik Temperatury 1";
+  sensor1.sensorStatus = "Ok";
+  sensor1.sensorType = "Temperatura";
+  sensor1.sensorValue = 0;
+  sensor1.sensorUnit = "oC";
+
+  //-----------------------------------------------------------
   // Connect to Wi-Fi network with SSID and password
   WiFi_Connect();
   // and start the Web Server
@@ -51,20 +87,17 @@ void setup(){
 }
 
 void loop(){
-  // Start function responsible for sending data from sensors to the Data Acquisition Server
-  TCP_SendDataToDas();
   // Start a local web server on a given module
   RunWebServer();
-}
 
-void TCP_SendDataToDas() {
+  // Check time interval
   uint32_t currentMillis = millis();
   static uint32_t lastMillis;
   const uint32_t interval = deviceUpdateInterval;
   
   // Connects to the computer, where the Data Acquisition Server (DAS) is installed
-  if (!client_A.connected()) {
-    if (client_A.connect(serverIP, portNumber)) {                                         
+  if (!client_WiFi.connected()) {
+    if (client_WiFi.connect(serverIP, portNumber)) {                                         
       Serial.print("Connected to the Data Acquisition Server IP address = "); Serial.println(serverIP);
     } else {
       Serial.print("Could NOT connect to the Data Acquisition Server IP address = "); Serial.println(serverIP);
@@ -74,16 +107,47 @@ void TCP_SendDataToDas() {
     // If succesfully connected to the DAS, the following lines will be executed
   } else {
     // Receives data from the DAS and sends to the serial port
-    while (client_A.available()) Serial.write(client_A.read());
+    while (client_WiFi.available()) Serial.write(client_WiFi.read());
     //while (client_A.available()) client_A.write(Serial.read());  to nie działa tak po prostu w drugą stronę
     
     // Sends the letter A (could be anything) to the DAS once every 'interval'
     if (currentMillis - lastMillis >= interval) {
         lastMillis += interval;
-        client_A.print("A");
+        //client_WiFi.print("A");
+        // Start function responsible for sending data from sensors to the Data Acquisition Server
+        SendDataToDas();
     }
   }
   
+}
+
+void SendDataToDas() {
+  // Add values to the document to serialize
+  doc["deviceSerialNo"] = deviceSerialNo;
+  doc["deviceName"] = deviceName;
+  doc["deviceIpAddress"] = deviceIpAddress;
+  doc["deviceStatus"] = deviceStatus;
+  doc["deviceUpdateInterval"] = deviceUpdateInterval;
+  doc["deviceBatteryLevel"] = deviceBatteryLevel;
+
+  JsonArray sensorsList = doc.createNestedArray("sensorsList");
+
+  // This part of code should be replicated for every sensor (be aware of Json buffer size!)
+  JsonObject obj1 = sensorsList.createNestedObject();
+  obj1["sensorSerialNo"] = sensor1.sensorSerialNo;
+  obj1["sensorName"] = sensor1.sensorName;
+  obj1["sensorStatus"] = sensor1.sensorStatus;
+  obj1["sensorType"] = sensor1.sensorType;
+  obj1["sensorValue"] = sensor1.sensorValue;   //16 bitów = 11+5
+  obj1["sensorUnit"] = sensor1.sensorUnit;    //18 bitów = 10+8
+
+  //int len1 = measureJson(doc);
+  //doc["len1"] = len1;
+
+  //serializeJson(doc, Serial);
+  serializeJson(doc, client_WiFi);
+
+  doc.clear();
 }
 
 
@@ -203,28 +267,3 @@ void WiFi_Connect(){
   deviceIpAddress = (WiFi.localIP()).toString();
 }
 
-class DeviceObj{
-  public:
-    int deviceSerialNo = 1;
-    String deviceName = "ArduinoModule_No1";
-    String deviceIpAddress;
-    String deviceStatus = "Ok";
-    int deviceUpdateInterval = 500; //miliseconds
-    int deviceBatteryLevel = 101;
-};
-
-class SensorObj{
-  public:
-    int parentSerialNo;
-    String parentName;
-    int sensorSerialNo;
-    String sensorName;
-    String sensorStatus;
-    String sensorType;
-    DateTime timeStamp;
-
-    float sensorValue_1;
-    float sensorValue_2;
-    String sensorUnit_1;
-    String sensorUnit_2;
-};

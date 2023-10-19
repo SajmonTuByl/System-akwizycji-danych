@@ -6,18 +6,6 @@ static void WiFi_Connect();
 static void SendDataToDas();
 static void RunWebServer();
 
-class SensorObj{
-  public:
-    int sensorSerialNo;
-    String sensorName;
-    String sensorStatus;
-    String sensorType;
-    //DateTime timeStamp;
-
-    float sensorValue;
-    String sensorUnit;
-};
-
 //-----------------------------------------------------------
 // WiFi network credentials
 String ssid     = "TestNetwork";
@@ -36,17 +24,26 @@ WiFiClient client_WiFi;
 
 //-----------------------------------------------------------
 // Device parameters definition
-int deviceSerialNo = 1;
+int deviceId = 1;
 String deviceName = "ArduinoModule_No1";
 String deviceIpAddress;
 String deviceStatus = "Ok";
 int deviceUpdateInterval = 4000; //miliseconds
 int deviceBatteryLevel = 101;
-SensorObj sensor1;
 
 //-----------------------------------------------------------
-StaticJsonDocument<600> doc;
-//DynamicJsonDocument doc(600);
+// Sensors arrays definition
+int sensorId[4] = {1,2,3,4};
+String sensorName[4] = {};
+String sensorStatus[4] = {};
+String sensorType[4] = {};
+float sensorValue[4] = {};
+String sensorUnit[4] = {};
+
+//-----------------------------------------------------------
+const int capacity = 6*JSON_OBJECT_SIZE(1) + 6*JSON_ARRAY_SIZE(4) + 6*4*JSON_OBJECT_SIZE(1);  //6 objects + 6 tables with 4 element + 6*4 1-element objects in arrays
+StaticJsonDocument<capacity> doc;
+//DynamicJsonDocument doc(capacity);
 
 //-----------------------------------------------------------
 // Set the Web Server port number to 80
@@ -70,14 +67,11 @@ void setup(){
   digitalWrite(output25, LOW);
   digitalWrite(output27, LOW);
   
-  //-----------------------------------------------------------
-  // Sensor 1 definition
-  sensor1.sensorSerialNo = 1;
-  sensor1.sensorName = "Czujnik Temperatury 1";
-  sensor1.sensorStatus = "Ok";
-  sensor1.sensorType = "Temperatura";
-  sensor1.sensorValue = 0;
-  sensor1.sensorUnit = "oC";
+  sensorName[0] = "Czujnik Temperatury 1";
+  sensorStatus[0] = "Ok";
+  sensorType[0] = "Temperatura";
+  sensorValue[0] = 0;
+  sensorUnit[0] = "oC";
 
   //-----------------------------------------------------------
   // Connect to Wi-Fi network with SSID and password
@@ -101,20 +95,18 @@ void loop(){
       Serial.print("Connected to the Data Acquisition Server IP address = "); Serial.println(serverIP);
     } else {
       Serial.print("Could NOT connect to the Data Acquisition Server IP address = "); Serial.println(serverIP);
-      delay(500);
+      delay(1000);
     }
 
-    // If succesfully connected to the DAS, the following lines will be executed
+  // If succesfully connected to the DAS, the following lines will be executed
   } else {
     // Receives data from the DAS and sends to the serial port
     while (client_WiFi.available()) Serial.write(client_WiFi.read());
     //while (client_A.available()) client_A.write(Serial.read());  to nie działa tak po prostu w drugą stronę
     
-    // Sends the letter A (could be anything) to the DAS once every 'interval'
+    // Sends the Json string to the DAS once every 'interval'
     if (currentMillis - lastMillis >= interval) {
         lastMillis += interval;
-        //client_WiFi.print("A");
-        // Start function responsible for sending data from sensors to the Data Acquisition Server
         SendDataToDas();
     }
   }
@@ -123,24 +115,43 @@ void loop(){
 
 void SendDataToDas() {
   // Add values to the document to serialize
-  doc["deviceSerialNo"] = deviceSerialNo;
+
+  // Device info
+  doc["deviceId"] = deviceId;
   doc["deviceName"] = deviceName;
   doc["deviceIpAddress"] = deviceIpAddress;
   doc["deviceStatus"] = deviceStatus;
   doc["deviceUpdateInterval"] = deviceUpdateInterval;
   doc["deviceBatteryLevel"] = deviceBatteryLevel;
 
-  JsonArray sensorsList = doc.createNestedArray("sensorsList");
+  // Arrays for sensors
+  JsonArray sensorId_Json = doc.createNestedArray("sensorId");
+  JsonArray sensorName_Json = doc.createNestedArray("sensorName");
+  JsonArray sensorStatus_Json = doc.createNestedArray("sensorStatus");
+  JsonArray sensorType_Json = doc.createNestedArray("sensorType");
+  JsonArray sensorValue_Json = doc.createNestedArray("sensorValue");
+  JsonArray sensorUnit_Json = doc.createNestedArray("sensorUnit");
 
-  // This part of code should be replicated for every sensor (be aware of Json buffer size!)
-  JsonObject obj1 = sensorsList.createNestedObject();
-  obj1["sensorSerialNo"] = sensor1.sensorSerialNo;
-  obj1["sensorName"] = sensor1.sensorName;
-  obj1["sensorStatus"] = sensor1.sensorStatus;
-  obj1["sensorType"] = sensor1.sensorType;
-  obj1["sensorValue"] = sensor1.sensorValue;   //16 bitów = 11+5
-  obj1["sensorUnit"] = sensor1.sensorUnit;    //18 bitów = 10+8
-
+  // Loading each Json array with values from our arrays
+  for (int id : sensorId){
+    sensorId_Json.add(id);
+  }
+  for (String name : sensorName){
+    sensorName_Json.add(name);
+  }
+  for (String status : sensorStatus){
+    sensorStatus_Json.add(status);
+  }
+  for (String type : sensorType){
+    sensorType_Json.add(type);
+  }
+  for (float value : sensorValue){
+    sensorValue_Json.add(value);
+  }
+  for (String unit : sensorUnit){
+    sensorUnit_Json.add(unit);
+  }
+  
   //int len1 = measureJson(doc);
   //doc["len1"] = len1;
 

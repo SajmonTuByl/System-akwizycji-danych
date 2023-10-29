@@ -1,6 +1,7 @@
 #include <Arduino.h>
 #include <WiFi.h>                         // ESP32 Wi-Fi library
 #include <ArduinoJson.h>
+#include <WebSockets.h>
 
 static void WiFi_Connect();
 static void SendDataToDas();

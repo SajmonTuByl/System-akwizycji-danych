@@ -1,27 +1,26 @@
 #include <Arduino.h>
 #include <WiFi.h>                         // ESP32 Wi-Fi library
+#include <WiFiMulti.h>
+//#include <ESP8266WiFi.h>
+//#include <ESP8266WiFiMulti.h>
+#include <WiFiClientSecure.h>
+#include <WebSocketsClient.h>
 #include <ArduinoJson.h>
-#include <WebSockets.h>
 
-static void WiFi_Connect();
 static void SendDataToDas();
 static void RunWebServer();
+static void hexdump(const void *mem, uint32_t len, uint8_t cols);
+static void webSocketEvent(WStype_t type, uint8_t * payload, size_t length);
 
-//-----------------------------------------------------------
-// WiFi network credentials
-String ssid     = "TestNetwork";
-String password = "TestNetwork";
-//String ssid     = "TP-LINK_C1C8";
-//String password = "44498245";
-//String ssid     = "Galaxy M21D80A";
-//String password = "grai9133";
+WiFiMulti WiFiMulti;
+WebSocketsClient webSocket;
 
 //-----------------------------------------------------------
 // Data Acquisition Server credentials
 //IPAddress serverIP(192, 168, 0, 102);
-IPAddress serverIP(192, 168, 1, 100);
+IPAddress serverIP(192, 168, 1, 69);
+//IPAddress serverIP(192, 168, 1, 100);
 #define portNumber 11000
-WiFiClient client_WiFi;
 
 //-----------------------------------------------------------
 // Device parameters definition
@@ -61,6 +60,37 @@ const int output27 = 27;
 
 void setup(){
   Serial.begin(9600);
+  Serial.setDebugOutput(true);
+
+  //-----------------------------------------------------------
+  // WiFi network credentials
+  WiFiMulti.addAP("HRTJ UniFi", "Macierz9");
+  //WiFiMulti.addAP("TestNetwork", "TestNetwork");
+  //WiFiMulti.addAP("TP-LINK_C1C8", "44498245");
+  //WiFiMulti.addAP("Galaxy M21D80A", "grai9133");
+
+  // WiFi.disconnect();
+  while(WiFiMulti.run() != WL_CONNECTED) {
+		delay(200);
+    Serial.print(".");
+	}
+  Serial.flush();
+
+  Serial.println(WiFi.SSID());
+  Serial.println(WiFi.localIP());
+
+  //-----------------------------------------------------------
+  // Setting WebSocket
+  // server address, port and URL
+	webSocket.begin(serverIP, portNumber, "/");
+	// event handler
+	webSocket.onEvent(webSocketEvent);
+	// use HTTP Basic Authorization this is optional remove if not needed
+	webSocket.setAuthorization("user", "Password");
+	// try ever 5000 again if connection has failed
+	webSocket.setReconnectInterval(5000);
+
+  //-----------------------------------------------------------
   // Initialize the output variables as outputs
   pinMode(output25, OUTPUT);
   pinMode(output27, OUTPUT);
@@ -75,43 +105,27 @@ void setup(){
   sensorUnit[0] = "oC";
 
   //-----------------------------------------------------------
-  // Connect to Wi-Fi network with SSID and password
-  WiFi_Connect();
-  // and start the Web Server
+  // start the Web Server
   server.begin();
 }
 
 void loop(){
+  webSocket.loop();
+  /*
   // Start a local web server on a given module
   RunWebServer();
-
+  
   // Check time interval
   uint32_t currentMillis = millis();
   static uint32_t lastMillis;
   const uint32_t interval = deviceUpdateInterval;
-  
-  // Connects to the computer, where the Data Acquisition Server (DAS) is installed
-  if (!client_WiFi.connected()) {
-    if (client_WiFi.connect(serverIP, portNumber)) {                                         
-      Serial.print("Connected to the Data Acquisition Server IP address = "); Serial.println(serverIP);
-    } else {
-      Serial.print("Could NOT connect to the Data Acquisition Server IP address = "); Serial.println(serverIP);
-      delay(1000);
-    }
-
-  // If succesfully connected to the DAS, the following lines will be executed
-  } else {
-    // Receives data from the DAS and sends to the serial port
-    while (client_WiFi.available()) Serial.write(client_WiFi.read());
-    //while (client_A.available()) client_A.write(Serial.read());  to nie działa tak po prostu w drugą stronę
     
-    // Sends the Json string to the DAS once every 'interval'
-    if (currentMillis - lastMillis >= interval) {
-        lastMillis += interval;
-        SendDataToDas();
-    }
+  // Sends the Json string to the DAS once every 'interval'
+  if (currentMillis - lastMillis >= interval) {
+      lastMillis += interval;
+      SendDataToDas();
   }
-  
+  */
 }
 
 void SendDataToDas() {
@@ -157,7 +171,9 @@ void SendDataToDas() {
   //doc["len1"] = len1;
 
   //serializeJson(doc, Serial);
-  serializeJson(doc, client_WiFi);
+  String data;
+  serializeJson(doc, data);
+  webSocket.sendTXT(data);
 
   doc.clear();
 }
@@ -165,16 +181,16 @@ void SendDataToDas() {
 
 void RunWebServer(){
   //--- Ta część dotyczy WebServera ---
-  WiFiClient client = server.available();   // Listen for incoming clients
+  WiFiClient clientWebServer = server.available();   // Listen for incoming clients
 
-  if (client) {                             // If a new client connects,
+  if (clientWebServer) {                             // If a new client connects,
     Serial.println();
     Serial.println("--------");
     Serial.println("New Client connected through a web browser.");          // print a message out in the serial port
     String currentLine = "";                // make a String to hold incoming data from the client
-    while (client.connected()) {            // loop while the client's connected
-      if (client.available()) {             // if there's bytes to read from the client,
-        char c = client.read();             // read a byte, then
+    while (clientWebServer.connected()) {            // loop while the client's connected
+      if (clientWebServer.available()) {             // if there's bytes to read from the client,
+        char c = clientWebServer.read();             // read a byte, then
         Serial.write(c);                    // print it out the serial monitor
         header += c;
         if (c == '\n') {                    // if the byte is a newline character
@@ -183,10 +199,10 @@ void RunWebServer(){
           if (currentLine.length() == 0) {
             // HTTP headers always start with a response code (e.g. HTTP/1.1 200 OK)
             // and a content-type so the client knows what's coming, then a blank line:
-            client.println("HTTP/1.1 200 OK");
-            client.println("Content-type:text/html");
-            client.println("Connection: close");
-            client.println();
+            clientWebServer.println("HTTP/1.1 200 OK");
+            clientWebServer.println("Content-type:text/html");
+            clientWebServer.println("Connection: close");
+            clientWebServer.println();
 
             // turns the GPIOs on and off
             if (header.indexOf("GET /25/on") >= 0) {
@@ -208,40 +224,40 @@ void RunWebServer(){
             }
 
             // Display the HTML web page
-            client.println("<!DOCTYPE html><html>");
-            client.println("<head><meta name=\"viewport\" content=\"width=device-width, initial-scale=1\">");
-            client.println("<link rel=\"icon\" href=\"data:,\">");
+            clientWebServer.println("<!DOCTYPE html><html>");
+            clientWebServer.println("<head><meta name=\"viewport\" content=\"width=device-width, initial-scale=1\">");
+            clientWebServer.println("<link rel=\"icon\" href=\"data:,\">");
             // CSS to style the on/off buttons
             // Feel free to change the background-color and font-size attributes to fit your preferences
-            client.println("<style>html { font-family: Helvetica; display: inline-block; margin: 0px auto; text-align: center;}");
-            client.println(".button { background-color: #4CAF50; border: none; color: white; padding: 16px 40px;");
-            client.println("text-decoration: none; font-size: 30px; margin: 2px; cursor: pointer;}");
-            client.println(".button2 {background-color: #888888;}</style></head>");
+            clientWebServer.println("<style>html { font-family: Helvetica; display: inline-block; margin: 0px auto; text-align: center;}");
+            clientWebServer.println(".button { background-color: #4CAF50; border: none; color: white; padding: 16px 40px;");
+            clientWebServer.println("text-decoration: none; font-size: 30px; margin: 2px; cursor: pointer;}");
+            clientWebServer.println(".button2 {background-color: #888888;}</style></head>");
 
             // Web Page Heading
-            client.println("<body><h1>ESP32 Web Server</h1>");
+            clientWebServer.println("<body><h1>ESP32 Web Server</h1>");
 
             // Display current state, and ON/OFF buttons for GPIO 25
-            client.println("<p>GPIO 25 - State " + output25State + "</p>");
+            clientWebServer.println("<p>GPIO 25 - State " + output25State + "</p>");
             // If the output25State is off, it displays the ON button
             if (output25State=="off") {
-              client.println("<p><a href=\"/25/on\"><button class=\"button\">ON</button></a></p>");
+              clientWebServer.println("<p><a href=\"/25/on\"><button class=\"button\">ON</button></a></p>");
             } else {
-              client.println("<p><a href=\"/25/off\"><button class=\"button button2\">OFF</button></a></p>");
+              clientWebServer.println("<p><a href=\"/25/off\"><button class=\"button button2\">OFF</button></a></p>");
             }
 
             // Display current state, and ON/OFF buttons for GPIO 27
-            client.println("<p>GPIO 27 - State " + output27State + "</p>");
+            clientWebServer.println("<p>GPIO 27 - State " + output27State + "</p>");
             // If the output27State is off, it displays the ON button
             if (output27State=="off") {
-              client.println("<p><a href=\"/27/on\"><button class=\"button\">ON</button></a></p>");
+              clientWebServer.println("<p><a href=\"/27/on\"><button class=\"button\">ON</button></a></p>");
             } else {
-              client.println("<p><a href=\"/27/off\"><button class=\"button button2\">OFF</button></a></p>");
+              clientWebServer.println("<p><a href=\"/27/off\"><button class=\"button button2\">OFF</button></a></p>");
             }
-            client.println("</body></html>");
+            clientWebServer.println("</body></html>");
 
             // The HTTP response ends with another blank line
-            client.println();
+            clientWebServer.println();
             // Break out of the while loop
             break;
           } else { // if you got a newline, then clear currentLine
@@ -255,27 +271,54 @@ void RunWebServer(){
     // Clear the header variable
     header = "";
     // Close the connection
-    client.stop();
+    clientWebServer.stop();
     Serial.println("Client disconnected.");
     Serial.println("------");
 }
 }
 
-void WiFi_Connect(){
-  Serial.print("Connecting to ");
-  Serial.println(ssid);
-  WiFi.begin(ssid, password);
-  while (WiFi.status() != WL_CONNECTED)
-  {
-    delay(500);
-    Serial.print(".");
-  }
-
-  // Print local IP address
-  Serial.println("");
-  Serial.println("WiFi connected.");
-  Serial.println("IP address: ");
-  Serial.println(WiFi.localIP());
-  deviceIpAddress = (WiFi.localIP()).toString();
+void hexdump(const void *mem, uint32_t len, uint8_t cols = 16) {
+	const uint8_t* src = (const uint8_t*) mem;
+	Serial.printf("\n[HEXDUMP] Address: 0x%08X len: 0x%X (%d)", (ptrdiff_t)src, len, len);
+	for(uint32_t i = 0; i < len; i++) {
+		if(i % cols == 0) {
+			Serial.printf("\n[0x%08X] 0x%08X: ", (ptrdiff_t)src, i);
+		}
+		Serial.printf("%02X ", *src);
+		src++;
+	}
+	Serial.printf("\n");
 }
 
+void webSocketEvent(WStype_t type, uint8_t * payload, size_t length) {
+	switch(type) {
+		case WStype_DISCONNECTED:
+			Serial.printf("[WSc] Disconnected!\n");
+			break;
+		case WStype_CONNECTED:
+			Serial.printf("[WSc] Connected to url: %s\n", payload);
+
+			// send message to server when Connected
+			webSocket.sendTXT("Connected");
+			break;
+		case WStype_TEXT:
+			Serial.printf("[WSc] get text: %s\n", payload);
+
+			// send message to server
+			// webSocket.sendTXT("message here");
+			break;
+		case WStype_BIN:
+			Serial.printf("[WSc] get binary length: %u\n", length);
+			hexdump(payload, length);
+
+			// send data to server
+			// webSocket.sendBIN(payload, length);
+			break;
+		case WStype_ERROR:			
+		case WStype_FRAGMENT_TEXT_START:
+		case WStype_FRAGMENT_BIN_START:
+		case WStype_FRAGMENT:
+		case WStype_FRAGMENT_FIN:
+			break;
+	}
+}

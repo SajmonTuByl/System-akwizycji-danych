@@ -12,7 +12,7 @@ static void RunWebServer();
 static void hexdump(const void *mem, uint32_t len, uint8_t cols);
 static void webSocketEvent(WStype_t type, uint8_t * payload, size_t length);
 
-WiFiMulti WiFiMulti;
+WiFiMulti wiFiMulti;
 WebSocketsClient webSocket;
 
 //-----------------------------------------------------------
@@ -64,13 +64,13 @@ void setup(){
 
   //-----------------------------------------------------------
   // WiFi network credentials
-  WiFiMulti.addAP("HRTJ UniFi", "Macierz9");
+  wiFiMulti.addAP("HRTJ UniFi", "Macierz9");
   //WiFiMulti.addAP("TestNetwork", "TestNetwork");
   //WiFiMulti.addAP("TP-LINK_C1C8", "44498245");
   //WiFiMulti.addAP("Galaxy M21D80A", "grai9133");
 
   // WiFi.disconnect();
-  while(WiFiMulti.run() != WL_CONNECTED) {
+  while(wiFiMulti.run() != WL_CONNECTED) {
 		delay(200);
     Serial.print(".");
 	}
@@ -111,8 +111,7 @@ void setup(){
 
 void loop(){
   webSocket.loop();
-  /*
-  // Start a local web server on a given module
+
   RunWebServer();
   
   // Check time interval
@@ -125,7 +124,7 @@ void loop(){
       lastMillis += interval;
       SendDataToDas();
   }
-  */
+
 }
 
 void SendDataToDas() {

@@ -18,7 +18,7 @@ WebSocketsClient webSocket;
 //-----------------------------------------------------------
 // Data Acquisition Server credentials
 //IPAddress serverIP(192, 168, 0, 102);
-IPAddress serverIP(192, 168, 1, 69);
+IPAddress serverIP(192, 168, 1, 101);
 //IPAddress serverIP(192, 168, 1, 100);
 #define portNumber 11000
 
@@ -65,9 +65,9 @@ void setup(){
   //-----------------------------------------------------------
   // WiFi network credentials
   wiFiMulti.addAP("HRTJ UniFi", "Macierz9");
-  //WiFiMulti.addAP("TestNetwork", "TestNetwork");
-  //WiFiMulti.addAP("TP-LINK_C1C8", "44498245");
-  //WiFiMulti.addAP("Galaxy M21D80A", "grai9133");
+  wiFiMulti.addAP("TestNetwork", "TestNetwork");
+  wiFiMulti.addAP("TP-LINK_C1C8", "44498245");
+  wiFiMulti.addAP("Galaxy M21D80A", "grai9133");
 
   // WiFi.disconnect();
   while(wiFiMulti.run() != WL_CONNECTED) {
@@ -295,10 +295,10 @@ void webSocketEvent(WStype_t type, uint8_t * payload, size_t length) {
 			Serial.printf("[WSc] Disconnected!\n");
 			break;
 		case WStype_CONNECTED:
-			Serial.printf("[WSc] Connected to url: %s\n", payload);
+			Serial.printf("[WSc] Connected to url: %s:%s%s\n", serverIP.toString(), portNumber, payload);
 
 			// send message to server when Connected
-			webSocket.sendTXT("Connected");
+			// webSocket.sendTXT("Connected");
 			break;
 		case WStype_TEXT:
 			Serial.printf("[WSc] get text: %s\n", payload);

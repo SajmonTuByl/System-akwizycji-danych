@@ -17,10 +17,10 @@ WebSocketsClient webSocket;
 
 //-----------------------------------------------------------
 // Data Acquisition Server credentials
-//IPAddress serverIP(192, 168, 1, 101);
-//IPAddress serverIP(192, 168, 1, 69);
+IPAddress serverIP(192, 168, 1, 101);
+//IPAddress serverIP(192, 168, 1, 66);
 //IPAddress serverIP(192, 168, 60, 84);
-IPAddress serverIP(192, 168, 1, 135);
+//IPAddress serverIP(192, 168, 1, 135);
 #define portNumber 11000
 
 //-----------------------------------------------------------
@@ -55,8 +55,9 @@ String header;
 String output25State = "off";
 String output27State = "off";
 // Assign output variables to GPIO pins
-const int output25 = 25;
-const int output27 = 27;
+const int ledRed = 18;
+const int ledGreen = 19;
+const int ledBlue = 23;
 //-----------------------------------------------------------
 
 void setup(){
@@ -64,15 +65,27 @@ void setup(){
   Serial.setDebugOutput(true);
 
   //-----------------------------------------------------------
+  // Initialize the output variables as outputs
+  pinMode(ledRed, OUTPUT);
+  pinMode(ledGreen, OUTPUT);
+  pinMode(ledBlue, OUTPUT);
+  // Set outputs to LOW
+  digitalWrite(ledRed, LOW);
+  digitalWrite(ledGreen, LOW);
+  digitalWrite(ledBlue, LOW);
+
+  //-----------------------------------------------------------
   // WiFi network credentials
   wiFiMulti.addAP("HRTJ UniFi", "Macierz9");
-  //wiFiMulti.addAP("TestNetwork", "TestNetwork");
+  wiFiMulti.addAP("TestNetwork", "TestNetwork");
   //wiFiMulti.addAP("TP-LINK_C1C8", "44498245");
   //wiFiMulti.addAP("Galaxy M21D80A", "grai9133");
 
   // WiFi.disconnect();
   while(wiFiMulti.run() != WL_CONNECTED) {
+    digitalWrite(ledRed, HIGH);
 		delay(200);
+    digitalWrite(ledRed, LOW);
     Serial.print(".");
 	}
   Serial.flush();
@@ -90,14 +103,6 @@ void setup(){
 	webSocket.setAuthorization("user", "Password");
 	// try ever 5000 again if connection has failed
 	webSocket.setReconnectInterval(5000);
-
-  //-----------------------------------------------------------
-  // Initialize the output variables as outputs
-  pinMode(output25, OUTPUT);
-  pinMode(output27, OUTPUT);
-  // Set outputs to LOW
-  digitalWrite(output25, LOW);
-  digitalWrite(output27, LOW);
   
   sensorName[0] = "Czujnik Temperatury 1";
   sensorStatus[0] = "Ok";
@@ -180,6 +185,7 @@ void SendDataToDas() {
 
 
 void RunWebServer(){
+  /*
   //--- Ta część dotyczy WebServera ---
   WiFiClient clientWebServer = server.available();   // Listen for incoming clients
 
@@ -274,7 +280,9 @@ void RunWebServer(){
     clientWebServer.stop();
     Serial.println("Client disconnected.");
     Serial.println("------");
-}
+    
+  }
+*/
 }
 
 void hexdump(const void *mem, uint32_t len, uint8_t cols = 16) {
@@ -294,8 +302,13 @@ void webSocketEvent(WStype_t type, uint8_t * payload, size_t length) {
 	switch(type) {
 		case WStype_DISCONNECTED:
 			Serial.printf("[WSc] Disconnected!\n");
+      digitalWrite(ledGreen, LOW);
+      digitalWrite(ledBlue, HIGH);
+      delay(10);
+      digitalWrite(ledBlue, LOW);
 			break;
 		case WStype_CONNECTED:
+      digitalWrite(ledGreen, HIGH);
 			//Serial.printf("[WSc] Connected to url: %s:%s%s\n", serverIP.toString(), portNumber, payload);
       Serial.printf("[WSc] Connected to url: %s:%s%s\n", serverIP.toString(), (String)portNumber, payload);
 

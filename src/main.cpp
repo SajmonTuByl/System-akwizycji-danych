@@ -17,8 +17,9 @@ WebSocketsClient webSocket;
 
 //-----------------------------------------------------------
 // Data Acquisition Server credentials
-IPAddress serverIP(192, 168, 1, 101);
-//IPAddress serverIP(192, 168, 1, 66);
+//IPAddress serverIP(192, 168, 1, 101);
+IPAddress serverIP(192, 168, 1, 69);
+
 //IPAddress serverIP(192, 168, 60, 84);
 //IPAddress serverIP(192, 168, 1, 135);
 #define portNumber 11000
@@ -92,6 +93,7 @@ void setup(){
 
   Serial.println(WiFi.SSID());
   Serial.println(WiFi.localIP());
+  deviceIpAddress = WiFi.localIP().toString();
 
   //-----------------------------------------------------------
   // Setting WebSocket
@@ -105,7 +107,7 @@ void setup(){
 	webSocket.setReconnectInterval(5000);
   
   sensorName[0] = "Czujnik Temperatury 1";
-  sensorStatus[0] = "Ok";
+  sensorStatus[0] = "1";
   sensorType[0] = "Temperatura";
   sensorValue[0] = 0;
   sensorUnit[0] = "oC";

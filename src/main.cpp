@@ -7,6 +7,9 @@
 #include <WebSocketsClient.h>
 #include <ArduinoJson.h>
 
+//#define RGB_BUILTIN   48
+#define RGB_BRIGHTNESS 3
+
 static void SendDataToDas();
 static void RunWebServer();
 static void hexdump(const void *mem, uint32_t len, uint8_t cols);
@@ -64,7 +67,7 @@ const int ledBlue = 23;
 void setup(){
   Serial.begin(9600);
   Serial.setDebugOutput(true);
-
+/*
   //-----------------------------------------------------------
   // Initialize the output variables as outputs
   pinMode(ledRed, OUTPUT);
@@ -74,7 +77,7 @@ void setup(){
   digitalWrite(ledRed, LOW);
   digitalWrite(ledGreen, LOW);
   digitalWrite(ledBlue, LOW);
-
+*/
   //-----------------------------------------------------------
   // WiFi network credentials
   wiFiMulti.addAP("HRTJ UniFi", "Macierz9");
@@ -85,7 +88,9 @@ void setup(){
   // WiFi.disconnect();
   while(wiFiMulti.run() != WL_CONNECTED) {
     digitalWrite(ledRed, HIGH);
+    neopixelWrite(RGB_BUILTIN,RGB_BRIGHTNESS,0,0); // Red
 		delay(200);
+    digitalWrite(RGB_BUILTIN, LOW);    // Turn the RGB LED off
     digitalWrite(ledRed, LOW);
     Serial.print(".");
 	}
@@ -304,13 +309,17 @@ void webSocketEvent(WStype_t type, uint8_t * payload, size_t length) {
 	switch(type) {
 		case WStype_DISCONNECTED:
 			Serial.printf("[WSc] Disconnected!\n");
-      digitalWrite(ledGreen, LOW);
-      digitalWrite(ledBlue, HIGH);
-      delay(10);
-      digitalWrite(ledBlue, LOW);
+      //neopixelWrite(RGB_BUILTIN,0,0,0);
+      //digitalWrite(ledGreen, LOW);
+      //digitalWrite(ledBlue, HIGH);
+      neopixelWrite(RGB_BUILTIN,0,0,RGB_BRIGHTNESS); // Blue
+      delay(50);
+      //digitalWrite(ledBlue, LOW);
+      neopixelWrite(RGB_BUILTIN,0,0,0);
 			break;
 		case WStype_CONNECTED:
       digitalWrite(ledGreen, HIGH);
+      neopixelWrite(RGB_BUILTIN,0,RGB_BRIGHTNESS,0); // Green
 			//Serial.printf("[WSc] Connected to url: %s:%s%s\n", serverIP.toString(), portNumber, payload);
       Serial.printf("[WSc] Connected to url: %s:%s%s\n", serverIP.toString(), (String)portNumber, payload);
 

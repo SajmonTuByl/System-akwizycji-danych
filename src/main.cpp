@@ -6,6 +6,7 @@
 #include <WiFiClientSecure.h>
 #include <WebSocketsClient.h>
 #include <ArduinoJson.h>
+#include "ADS1X15.h"
 
 //#define RGB_BUILTIN   48
 #define RGB_BRIGHTNESS 3
@@ -17,6 +18,8 @@ static void webSocketEvent(WStype_t type, uint8_t * payload, size_t length);
 
 WiFiMulti wiFiMulti;
 WebSocketsClient webSocket;
+
+ADS1115 ADS(0x48);
 
 //-----------------------------------------------------------
 // Data Acquisition Server credentials
@@ -67,6 +70,8 @@ const int ledBlue = 23;
 void setup(){
   Serial.begin(9600);
   Serial.setDebugOutput(true);
+
+  setupAds();
 /*
   //-----------------------------------------------------------
   // Initialize the output variables as outputs
@@ -124,8 +129,6 @@ void setup(){
 
 void loop(){
   webSocket.loop();
-
-  RunWebServer();
   
   // Check time interval
   uint32_t currentMillis = millis();
@@ -190,108 +193,6 @@ void SendDataToDas() {
   doc.clear();
 }
 
-
-void RunWebServer(){
-  /*
-  //--- Ta część dotyczy WebServera ---
-  WiFiClient clientWebServer = server.available();   // Listen for incoming clients
-
-  if (clientWebServer) {                             // If a new client connects,
-    Serial.println();
-    Serial.println("--------");
-    Serial.println("New Client connected through a web browser.");          // print a message out in the serial port
-    String currentLine = "";                // make a String to hold incoming data from the client
-    while (clientWebServer.connected()) {            // loop while the client's connected
-      if (clientWebServer.available()) {             // if there's bytes to read from the client,
-        char c = clientWebServer.read();             // read a byte, then
-        Serial.write(c);                    // print it out the serial monitor
-        header += c;
-        if (c == '\n') {                    // if the byte is a newline character
-          // if the current line is blank, you got two newline characters in a row.
-          // that's the end of the client HTTP request, so send a response:
-          if (currentLine.length() == 0) {
-            // HTTP headers always start with a response code (e.g. HTTP/1.1 200 OK)
-            // and a content-type so the client knows what's coming, then a blank line:
-            clientWebServer.println("HTTP/1.1 200 OK");
-            clientWebServer.println("Content-type:text/html");
-            clientWebServer.println("Connection: close");
-            clientWebServer.println();
-
-            // turns the GPIOs on and off
-            if (header.indexOf("GET /25/on") >= 0) {
-              Serial.println("GPIO 25 on");
-              output25State = "on";
-              digitalWrite(output25, HIGH);
-            } else if (header.indexOf("GET /25/off") >= 0) {
-              Serial.println("GPIO 25 off");
-              output25State = "off";
-              digitalWrite(output25, LOW);
-            } else if (header.indexOf("GET /27/on") >= 0) {
-              Serial.println("GPIO 27 on");
-              output27State = "on";
-              digitalWrite(output27, HIGH);
-            } else if (header.indexOf("GET /27/off") >= 0) {
-              Serial.println("GPIO 27 off");
-              output27State = "off";
-              digitalWrite(output27, LOW);
-            }
-
-            // Display the HTML web page
-            clientWebServer.println("<!DOCTYPE html><html>");
-            clientWebServer.println("<head><meta name=\"viewport\" content=\"width=device-width, initial-scale=1\">");
-            clientWebServer.println("<link rel=\"icon\" href=\"data:,\">");
-            // CSS to style the on/off buttons
-            // Feel free to change the background-color and font-size attributes to fit your preferences
-            clientWebServer.println("<style>html { font-family: Helvetica; display: inline-block; margin: 0px auto; text-align: center;}");
-            clientWebServer.println(".button { background-color: #4CAF50; border: none; color: white; padding: 16px 40px;");
-            clientWebServer.println("text-decoration: none; font-size: 30px; margin: 2px; cursor: pointer;}");
-            clientWebServer.println(".button2 {background-color: #888888;}</style></head>");
-
-            // Web Page Heading
-            clientWebServer.println("<body><h1>ESP32 Web Server</h1>");
-
-            // Display current state, and ON/OFF buttons for GPIO 25
-            clientWebServer.println("<p>GPIO 25 - State " + output25State + "</p>");
-            // If the output25State is off, it displays the ON button
-            if (output25State=="off") {
-              clientWebServer.println("<p><a href=\"/25/on\"><button class=\"button\">ON</button></a></p>");
-            } else {
-              clientWebServer.println("<p><a href=\"/25/off\"><button class=\"button button2\">OFF</button></a></p>");
-            }
-
-            // Display current state, and ON/OFF buttons for GPIO 27
-            clientWebServer.println("<p>GPIO 27 - State " + output27State + "</p>");
-            // If the output27State is off, it displays the ON button
-            if (output27State=="off") {
-              clientWebServer.println("<p><a href=\"/27/on\"><button class=\"button\">ON</button></a></p>");
-            } else {
-              clientWebServer.println("<p><a href=\"/27/off\"><button class=\"button button2\">OFF</button></a></p>");
-            }
-            clientWebServer.println("</body></html>");
-
-            // The HTTP response ends with another blank line
-            clientWebServer.println();
-            // Break out of the while loop
-            break;
-          } else { // if you got a newline, then clear currentLine
-            currentLine = "";
-          }
-        } else if (c != '\r') {  // if you got anything else but a carriage return character,
-          currentLine += c;      // add it to the end of the currentLine
-        }
-      }
-    }
-    // Clear the header variable
-    header = "";
-    // Close the connection
-    clientWebServer.stop();
-    Serial.println("Client disconnected.");
-    Serial.println("------");
-    
-  }
-*/
-}
-
 void hexdump(const void *mem, uint32_t len, uint8_t cols = 16) {
 	const uint8_t* src = (const uint8_t*) mem;
 	Serial.printf("\n[HEXDUMP] Address: 0x%08X len: 0x%X (%d)", (ptrdiff_t)src, len, len);
@@ -346,4 +247,29 @@ void webSocketEvent(WStype_t type, uint8_t * payload, size_t length) {
 		case WStype_FRAGMENT_FIN:
 			break;
 	}
+
+  void setupAds()
+  {
+    Serial.print("ADS1X15_LIB_VERSION: ");
+    Serial.println(ADS1X15_LIB_VERSION);
+    ADS.begin();
+    Wire.setClock(100000);
+    ADS.setGain(0);  // 6.144 volt
+    //  0 = slow   4 = medium   7 = fast
+    ADS.setDataRate(7);
+    //results = ads.readADC_Differential_0_1();
+
+    //max 860 sps
+    //SPI interface like ADS5484
+  }
+
+  void readAds()
+  {
+    int x;
+    
+    ADS.setMode(1);
+    x = ADS.readADC(0);
+
+    ADS.setMode(0);
+    x = ADS.getValue();
 }

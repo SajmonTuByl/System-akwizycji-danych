@@ -6,15 +6,23 @@
 #include <WiFiClientSecure.h>
 #include <WebSocketsClient.h>
 #include <ArduinoJson.h>
-#include "ADS1X15.h"
+#include <ADS1X15.h>
+//#include <Wire.h>   //I2C
+
+//#define SDA 1
+//#define SCL 2
+
+
 
 //#define RGB_BUILTIN   48
 #define RGB_BRIGHTNESS 3
 
 static void SendDataToDas();
-static void RunWebServer();
 static void hexdump(const void *mem, uint32_t len, uint8_t cols);
 static void webSocketEvent(WStype_t type, uint8_t * payload, size_t length);
+static void setupAds();
+static void readAds();
+static void i2cScanner();
 
 WiFiMulti wiFiMulti;
 WebSocketsClient webSocket;
@@ -70,6 +78,10 @@ const int ledBlue = 23;
 void setup(){
   Serial.begin(9600);
   Serial.setDebugOutput(true);
+
+  Serial.println(F("\nI2C PINS"));
+  Serial.print(F("\tSDA = ")); Serial.println(SDA);
+  Serial.print(F("\tSCL = ")); Serial.println(SCL);
 
   setupAds();
 /*
@@ -130,6 +142,11 @@ void setup(){
 void loop(){
   webSocket.loop();
   
+
+
+i2cScanner();
+
+
   // Check time interval
   uint32_t currentMillis = millis();
   static uint32_t lastMillis;
@@ -140,7 +157,7 @@ void loop(){
       lastMillis += interval;
       SendDataToDas();
   }
-
+  readAds();
 }
 
 void SendDataToDas() {
@@ -247,12 +264,13 @@ void webSocketEvent(WStype_t type, uint8_t * payload, size_t length) {
 		case WStype_FRAGMENT_FIN:
 			break;
 	}
+}
 
-  void setupAds()
-  {
+  void setupAds(){
     Serial.print("ADS1X15_LIB_VERSION: ");
     Serial.println(ADS1X15_LIB_VERSION);
     ADS.begin();
+    Serial.println(ADS.isConnected());
     Wire.setClock(100000);
     ADS.setGain(0);  // 6.144 volt
     //  0 = slow   4 = medium   7 = fast
@@ -263,13 +281,68 @@ void webSocketEvent(WStype_t type, uint8_t * payload, size_t length) {
     //SPI interface like ADS5484
   }
 
-  void readAds()
-  {
+  void readAds(){
     int x;
     
     ADS.setMode(1);
-    x = ADS.readADC(0);
+    x = ADS.readADC(0); //0 1 2 3
+    Serial.println(x);
 
     ADS.setMode(0);
     x = ADS.getValue();
-}
+    Serial.println(x);
+  }
+
+  void i2cScanner(){
+    byte error, address;
+  int nDevices;
+
+  Serial.println("Scanning...");
+
+  nDevices = 0;
+  for(address = 1; address < 127; address++ ) 
+  {
+    // The i2c_scanner uses the return value of
+    // the Write.endTransmisstion to see if
+    // a device did acknowledge to the address.
+    
+    // 0: success
+    // 1: busy timeout upon entering endTransmission()
+    // 2: START bit generation timeout
+    // 3: end of address transmission timeout
+    // 4: data byte transfer timeout
+    // 5: data byte transfer succeeded, busy timeout immediately after
+    // 6: timeout waiting for peripheral to clear stop bit
+
+    Wire.beginTransmission(address);
+    error = Wire.endTransmission();
+
+    Serial.println(address);
+    Serial.print("Error: ");
+    Serial.println(error);
+
+    if (error == 0)
+    {
+      Serial.print("I2C device found at address 0x");
+      if (address<16) 
+        Serial.print("0");
+      Serial.print(address,HEX);
+      Serial.println("  !");
+
+      nDevices++;
+    }
+    else if (error==4) 
+    {
+      Serial.print("Unknown error at address 0x");
+      if (address<16) 
+        Serial.print("0");
+      Serial.println(address,HEX);
+    }    
+  }
+  if (nDevices == 0)
+    Serial.println("No I2C devices found\n");
+  else
+    Serial.println("done\n");
+
+  delay(2000);
+  }

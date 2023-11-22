@@ -61,14 +61,6 @@ const int capacity = 6*JSON_OBJECT_SIZE(1) + 6*JSON_ARRAY_SIZE(4) + 6*4*JSON_OBJ
 StaticJsonDocument<capacity> doc;
 //DynamicJsonDocument doc(capacity);
 
-//-----------------------------------------------------------
-// Set the Web Server port number to 80
-WiFiServer server(80);
-// Variable to store the HTTP request
-String header;
-// Auxiliar variables to store the current output state
-String output25State = "off";
-String output27State = "off";
 // Assign output variables to GPIO pins
 const int ledRed = 18;
 const int ledGreen = 19;
@@ -79,11 +71,16 @@ void setup(){
   Serial.begin(9600);
   Serial.setDebugOutput(true);
 
+
+/*
   Serial.println(F("\nI2C PINS"));
   Serial.print(F("\tSDA = ")); Serial.println(SDA);
   Serial.print(F("\tSCL = ")); Serial.println(SCL);
 
   setupAds();
+  */
+
+
 /*
   //-----------------------------------------------------------
   // Initialize the output variables as outputs
@@ -133,10 +130,6 @@ void setup(){
   sensorType[0] = "Temperatura";
   sensorValue[0] = 0;
   sensorUnit[0] = "oC";
-
-  //-----------------------------------------------------------
-  // start the Web Server
-  server.begin();
 }
 
 void loop(){
@@ -144,7 +137,7 @@ void loop(){
   
 
 
-i2cScanner();
+  //i2cScanner();
 
 
   // Check time interval
@@ -157,7 +150,9 @@ i2cScanner();
       lastMillis += interval;
       SendDataToDas();
   }
-  readAds();
+
+
+  //readAds();
 }
 
 void SendDataToDas() {

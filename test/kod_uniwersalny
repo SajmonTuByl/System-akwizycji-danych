@@ -1,25 +1,32 @@
 #include <Arduino.h>
 #include <WiFi.h>                         // ESP32 Wi-Fi library
 #include <WiFiMulti.h>
+//#include <ESP8266WiFi.h>
+//#include <ESP8266WiFiMulti.h>
 #include <WiFiClientSecure.h>
 #include <WebSocketsClient.h>
 #include <ArduinoJson.h>
-#include <math.h>
+#include <ADS1X15.h>
 
-//#define RGB_BUILTIN
+//#define SDA 1
+//#define SCL 2
+//#define RGB_BUILTIN   48
 #define RGB_BRIGHTNESS 3
 
 static void SendDataToDas();
 static void hexdump(const void *mem, uint32_t len, uint8_t cols);
 static void webSocketEvent(WStype_t type, uint8_t * payload, size_t length);
-static float voltageToPh(float voltage);
+static void setupAds();
+static void readAds();
 
 WiFiMulti wiFiMulti;
 WebSocketsClient webSocket;
+
+ADS1115 ADS(0x48);
 //-----------------------------------------------------------
 // Data Acquisition Server credentials
 IPAddress serverIP(192, 168, 1, 101);
-//IPAddress serverIP(192, 168, 1, 69);
+IPAddress serverIP(192, 168, 1, 69);
 
 //IPAddress serverIP(192, 168, 60, 84);
 //IPAddress serverIP(192, 168, 1, 135);
@@ -30,7 +37,7 @@ int deviceId = 1;
 String deviceName = "Board_No1";
 String deviceIpAddress;
 String deviceStatus = "Ok";
-int deviceUpdateInterval = 1000; //miliseconds
+int deviceUpdateInterval = 4000; //miliseconds
 int deviceBatteryLevel = 101;
 //-----------------------------------------------------------
 // Sensors arrays definition
@@ -45,9 +52,28 @@ const int capacity = 6*JSON_OBJECT_SIZE(1) + 6*JSON_ARRAY_SIZE(4) + 6*4*JSON_OBJ
 StaticJsonDocument<capacity> doc;
 //DynamicJsonDocument doc(capacity);
 //-----------------------------------------------------------
+const int ledRed = 18;
+const int ledGreen = 19;
+const int ledBlue = 23;
+
 void setup(){
   Serial.begin(9600);
   Serial.setDebugOutput(true);
+  // Check SDA, SCL pins
+  Serial.println(F("\nI2C PINS"));
+  Serial.print(F("\tSDA = ")); Serial.println(SDA);
+  Serial.print(F("\tSCL = ")); Serial.println(SCL);
+
+  setupAds();
+  //-----------------------------------------------------------
+  // Initialize the output variables as outputs
+  pinMode(ledRed, OUTPUT);
+  pinMode(ledGreen, OUTPUT);
+  pinMode(ledBlue, OUTPUT);
+  // Set outputs to LOW
+  digitalWrite(ledRed, LOW);
+  digitalWrite(ledGreen, LOW);
+  digitalWrite(ledBlue, LOW);
   //-----------------------------------------------------------
   // WiFi network credentials
   wiFiMulti.addAP("HRTJ UniFi", "Macierz9");
@@ -57,9 +83,11 @@ void setup(){
 
   // WiFi.disconnect();
   while(wiFiMulti.run() != WL_CONNECTED) {
+    digitalWrite(ledRed, HIGH);
     neopixelWrite(RGB_BUILTIN,RGB_BRIGHTNESS,0,0); // Red
 		delay(200);
     digitalWrite(RGB_BUILTIN, LOW);    // Turn the RGB LED off
+    digitalWrite(ledRed, LOW);
     Serial.print(".");
 	}
   Serial.flush();
@@ -78,59 +106,16 @@ void setup(){
 	// try ever 5000 again if connection has failed
 	webSocket.setReconnectInterval(5000);
   //-----------------------------------------------------------
-  sensorName[0] = "Sonda pH 1";
+  sensorName[0] = "Czujnik Temperatury 1";
   sensorStatus[0] = "1";
-  sensorType[0] = "pH";
+  sensorType[0] = "Temperatura";
   sensorValue[0] = 0;
-  sensorUnit[0] = "pH";
-  sensorName[1] = "Sonda pH 1";
-  sensorStatus[1] = "1";
-  sensorType[1] = "pH";
-  sensorValue[1] = 0;
-  sensorUnit[1] = "mV";
-
-  sensorName[2] = "Sonda pH 2";
-  sensorStatus[2] = "1";
-  sensorType[2] = "pH";
-  sensorValue[2] = 0;
-  sensorUnit[2] = "pH";
-  sensorName[3] = "Sonda pH 2";
-  sensorStatus[3] = "1";
-  sensorType[3] = "pH";
-  sensorValue[3] = 0;
-  sensorUnit[3] = "mV";
+  sensorUnit[0] = "oC";
 }
 
 void loop(){
   webSocket.loop();
-
-  int sensorValue1 = analogRead(1);
-  int sensorValue2 = analogRead(2);
-
-  float zero1 = 2.5;
-  float zero2 = 2.5;
-
-  float voltage1 = (roundf(sensorValue1 * (3.3 / 4095.0) * 1000 * 100)/100)-zero1;
-  float voltage2 = (roundf(sensorValue2 * (3.3 / 4095.0) * 1000 * 100)/100)-zero2;
-
-  float pH1 = voltageToPh(voltage1);
-  float pH2 = voltageToPh(voltage2);
-
-  sensorValue[1] = voltage1;
-  sensorValue[3] = voltage2;
-
-  Serial.print(voltage1);
-  Serial.print(" mV");
-  Serial.print("    ");
-  Serial.print(voltage2);
-  Serial.print(" mV");
-  Serial.print("    ");
-  Serial.print("pH ");
-  Serial.print(pH1);
-  Serial.print("    ");
-  Serial.print("pH ");
-  Serial.println(pH2);
-
+  
   // Check time interval
   uint32_t currentMillis = millis();
   static uint32_t lastMillis;
@@ -180,7 +165,11 @@ void SendDataToDas() {
   for (String unit : sensorUnit){
     sensorUnit_Json.add(unit);
   }
+  
+  //int len1 = measureJson(doc);
+  //doc["len1"] = len1;
 
+  //serializeJson(doc, Serial);
   String data;
   serializeJson(doc, data);
   webSocket.sendTXT(data);
@@ -207,25 +196,37 @@ void webSocketEvent(WStype_t type, uint8_t * payload, size_t length) {
 			Serial.printf("[WSc] Disconnected!\n");
 
       //neopixelWrite(RGB_BUILTIN,0,0,0);
-      neopixelWrite(RGB_BUILTIN,0,0,RGB_BRIGHTNESS); // Blue
+      digitalWrite(ledGreen, LOW);
+      digitalWrite(ledBlue, HIGH);
+      //neopixelWrite(RGB_BUILTIN,0,0,RGB_BRIGHTNESS); // Blue
       delay(100);
-      neopixelWrite(RGB_BUILTIN,0,0,0);
+      digitalWrite(ledBlue, LOW);
+      //neopixelWrite(RGB_BUILTIN,0,0,0);
 
 			break;
 		case WStype_CONNECTED:
-      neopixelWrite(RGB_BUILTIN,0,RGB_BRIGHTNESS,0); // Green
-      Serial.printf("[WSc] Connected to url: %s:%s%s\n", serverIP.toString(), (String)portNumber, payload);
-			break;
+      digitalWrite(ledGreen, HIGH);
+      //neopixelWrite(RGB_BUILTIN,0,RGB_BRIGHTNESS,0); // Green
 
+			//Serial.printf("[WSc] Connected to url: %s:%s%s\n", serverIP.toString(), portNumber, payload);
+      Serial.printf("[WSc] Connected to url: %s:%s%s\n", serverIP.toString(), (String)portNumber, payload);
+
+			// send message to server when Connected
+			//webSocket.sendTXT("Connected");
+			break;
 		case WStype_TEXT:
 			Serial.printf("[WSc] get text: %s\n", payload);
-			break;
 
+			// send message to server
+			// webSocket.sendTXT("message here");
+			break;
 		case WStype_BIN:
 			Serial.printf("[WSc] get binary length: %u\n", length);
 			hexdump(payload, length);
-			break;
 
+			// send data to server
+			// webSocket.sendBIN(payload, length);
+			break;
 		case WStype_ERROR:			
 		case WStype_FRAGMENT_TEXT_START:
 		case WStype_FRAGMENT_BIN_START:
@@ -235,9 +236,26 @@ void webSocketEvent(WStype_t type, uint8_t * payload, size_t length) {
 	}
 }
 
-float voltageToPh(float voltage){
-  float pH;
-  pH = (0,222 - ((2,303*8,3145*298)/96485))/(voltage/1000);
+void setupAds(){
+    Serial.print("ADS1X15_LIB_VERSION: ");
+    Serial.println(ADS1X15_LIB_VERSION);
+    ADS.begin();
+    Serial.println(ADS.isConnected());
+    Wire.setClock(100000);
+    ADS.setGain(0);  // 6.144 volt
+    //  0 = slow   4 = medium   7 = fast
+    ADS.setDataRate(7);
+    //results = ads.readADC_Differential_0_1();
+  }
 
-  return pH;
-}
+  void readAds(){
+    int x;
+    
+    ADS.setMode(1);
+    x = ADS.readADC(0); //0 1 2 3
+    Serial.println(x);
+
+    ADS.setMode(0);
+    x = ADS.getValue();
+    Serial.println(x);
+  }

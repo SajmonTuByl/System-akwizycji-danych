@@ -12,7 +12,7 @@
 static void SendDataToDas();
 static void hexdump(const void *mem, uint32_t len, uint8_t cols);
 static void webSocketEvent(WStype_t type, uint8_t * payload, size_t length);
-static float voltageToPh(float voltage);
+static float voltageToPh(float voltage, float temp);
 
 WiFiMulti wiFiMulti;
 WebSocketsClient webSocket;
@@ -30,7 +30,7 @@ int deviceId = 1;
 String deviceName = "Board_No1";
 String deviceIpAddress;
 String deviceStatus = "Ok";
-int deviceUpdateInterval = 1000; //miliseconds
+int deviceUpdateInterval = 3000; //miliseconds
 int deviceBatteryLevel = 101;
 //-----------------------------------------------------------
 // Sensors arrays definition
@@ -89,13 +89,13 @@ void setup(){
   sensorValue[1] = 0;
   sensorUnit[1] = "mV";
 
-  sensorName[2] = "Sonda pH 2";
-  sensorStatus[2] = "1";
+  sensorName[2] = "";   //Sonda pH 2"
+  sensorStatus[2] = "";
   sensorType[2] = "pH";
   sensorValue[2] = 0;
   sensorUnit[2] = "pH";
-  sensorName[3] = "Sonda pH 2";
-  sensorStatus[3] = "1";
+  sensorName[3] = "";   //Sonda pH 2"
+  sensorStatus[3] = "";
   sensorType[3] = "pH";
   sensorValue[3] = 0;
   sensorUnit[3] = "mV";
@@ -107,16 +107,18 @@ void loop(){
   int sensorValue1 = analogRead(1);
   int sensorValue2 = analogRead(2);
 
-  float zero1 = 2.5;
-  float zero2 = 2.5;
+  float zero1 = 2500;
+  float zero2 = 2500;
 
   float voltage1 = (roundf(sensorValue1 * (3.3 / 4095.0) * 1000 * 100)/100)-zero1;
   float voltage2 = (roundf(sensorValue2 * (3.3 / 4095.0) * 1000 * 100)/100)-zero2;
 
-  float pH1 = voltageToPh(voltage1);
-  float pH2 = voltageToPh(voltage2);
+  float pH1 = voltageToPh(voltage1, 298);
+  float pH2 = voltageToPh(voltage2, 298);
 
+  sensorValue[0] = pH1;
   sensorValue[1] = voltage1;
+  sensorValue[2] = pH2;
   sensorValue[3] = voltage2;
 
   Serial.print(voltage1);
@@ -235,9 +237,11 @@ void webSocketEvent(WStype_t type, uint8_t * payload, size_t length) {
 	}
 }
 
-float voltageToPh(float voltage){
-  float pH;
-  pH = (0,222 - ((2,303*8,3145*298)/96485))/(voltage/1000);
+float voltageToPh(float voltage, float temp){
+  float pH = 7.0;
+  float slope = ((2.303*8.3145*temp)/96485.0)*1000; //mV/pH
+  if(voltage>0) pH = pH - abs(voltage)/slope;
+  if(voltage<0) pH = pH + abs(voltage)/slope;
 
   return pH;
 }

@@ -1,3 +1,5 @@
+// Kod dla mikrokontrolera opartego na ESP8266 (NodeMCU) z podłączony czujnikiem temperatury i ciśnienia
+
 #include <Arduino.h>
 #include <ESP8266WiFi.h>
 #include <ESP8266WiFiMulti.h>

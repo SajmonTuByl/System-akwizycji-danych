@@ -126,7 +126,7 @@ void loop(){
   ADS.setMode(0);
   float f = ADS.toVoltage(1);
   sensorValue[0] = ADS.readADC(0) * f / 0.011; // 0,011V/oC
-  sensorValue[1] = ADS.readADC(1) * f / 0.0132; // 0,0132V/bar
+  sensorValue[1] = ADS.readADC(1) * f / 0.00825; // 0,0132V/bar dla 250 bar, 0,00825V/bar dla 400 bar
 
   Serial.print("ADS 0: ");
   Serial.print(sensorValue[0]);
